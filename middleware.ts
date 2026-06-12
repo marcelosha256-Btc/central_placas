@@ -1,6 +1,42 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
-import { ROLE_PERMISSIONS, API_ROUTE_MODULE, PAGE_ROUTE_MODULE } from '@/lib/permissions';
+
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  admin: ['dashboard', 'pedidos', 'clientes', 'produtos', 'tabelas-preco', 'estoque', 'financeiro', 'relatorios', 'auditoria', 'funcionarios'],
+  vendedor: ['dashboard', 'pedidos', 'clientes', 'produtos', 'tabelas-preco'],
+  caixa: ['dashboard', 'pedidos', 'estoque', 'financeiro', 'relatorios'],
+};
+
+const API_ROUTE_MODULE: Record<string, string> = {
+  '/api/orders': 'pedidos',
+  '/api/customers': 'clientes',
+  '/api/products': 'produtos',
+  '/api/price-tables': 'tabelas-preco',
+  '/api/stock': 'estoque',
+  '/api/invoices': 'financeiro',
+  '/api/cash': 'financeiro',
+  '/api/expenses': 'financeiro',
+  '/api/payments': 'financeiro',
+  '/api/receivables': 'financeiro',
+  '/api/relatorios/auditoria': 'auditoria',
+  '/api/relatorios': 'relatorios',
+  '/api/envio-mensal': 'relatorios',
+  '/api/dashboard': 'dashboard',
+  '/api/funcionarios': 'funcionarios',
+};
+
+const PAGE_ROUTE_MODULE: Record<string, string> = {
+  '/dashboard': 'dashboard',
+  '/pedidos': 'pedidos',
+  '/clientes': 'clientes',
+  '/produtos': 'produtos',
+  '/tabelas-preco': 'tabelas-preco',
+  '/estoque': 'estoque',
+  '/financeiro': 'financeiro',
+  '/relatorios/auditoria': 'auditoria',
+  '/relatorios': 'relatorios',
+  '/funcionarios': 'funcionarios',
+};
 
 function getModuleFromPath(pathname: string): string | null {
   for (const [prefix, mod] of Object.entries(API_ROUTE_MODULE)) {
@@ -20,19 +56,16 @@ export default withAuth(
 
     const module = getModuleFromPath(pathname);
 
-    // Se não mapeou nenhum módulo, permite (rota pública/auth)
     if (!module) return NextResponse.next();
 
     const perms = ROLE_PERMISSIONS[role];
     if (!perms || !perms.includes(module)) {
-      // API: retorna 403
       if (pathname.startsWith('/api/')) {
         return NextResponse.json(
           { error: 'Sem permissão para acessar este recurso' },
           { status: 403 }
         );
       }
-      // Página: redireciona para dashboard (que todos podem acessar)
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
