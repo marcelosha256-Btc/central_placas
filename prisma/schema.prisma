@@ -1,0 +1,351 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  password       String
+  role           String   @default("admin")
+  phone          String?  @default("")
+  active         Boolean  @default(true)
+  commissionRate Float?   @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  discountLimit  Float    @default(0)  // limite de desconto em R$ (0 = sem limite se admin)
+
+  orders         Order[]
+  cashRegisters  CashRegister[]
+  customers      Customer[] @relation("CustomerSeller")
+  discounts      InvoiceDiscount[]
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  personType  String   @default("PF") // PF or PJ
+  document    String   @unique // CPF or CNPJ
+  phone       String?  @default("")
+  whatsapp    String?  @default("")
+  email       String?  @default("")
+  cep         String?  @default("")
+  street      String?  @default("")
+  number      String?  @default("")
+  complement  String?  @default("")
+  neighborhood String? @default("")
+  city        String?  @default("")
+  state       String?  @default("")
+  priceTableId  String?
+  priceTable    PriceTable? @relation(fields: [priceTableId], references: [id])
+  sellerId      String?
+  seller        User?       @relation("CustomerSeller", fields: [sellerId], references: [id])
+  monthlyReport Boolean @default(false)
+  reportType    String  @default("detalhado") // detalhado ou resumido
+  paymentTerm   String  @default("AVISTA") // AVISTA, D15, D30
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders Order[]
+  monthlySends MonthlySend[]
+  invoices     Invoice[]
+
+  @@index([name])
+  @@index([document])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  category    String   @default("Placa")
+  basePrice   Float    @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Controle de estoque — Fase 1
+  trackStock    Boolean @default(false) // produto-base com saldo próprio (ex: PLACA PRIMARIA CARRO)
+  stockQuantity Float   @default(0)
+  minStock      Float   @default(0)
+
+  // Fase 1b — fator de consumo (produto de venda → chapa base)
+  stockItemId    String? // aponta para o produto-base que tem trackStock=true
+  consumptionQty Float   @default(1) // quantas chapas base esta venda consome (Par=2, Avulsa=1)
+  leadTimeDays   Int     @default(7) // prazo de entrega do fornecedor (dias) — para alertas de reposição
+  stockItem      Product?  @relation("StockLink", fields: [stockItemId], references: [id])
+  derivedItems   Product[] @relation("StockLink")
+
+  priceTableItems PriceTableItem[]
+  orderItems      OrderItem[]
+  stockMovements  StockMovement[]
+}
+
+model StockMovement {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  type       String   // ENTRADA | SAIDA | AJUSTE
+  quantity   Float    // ENTRADA/SAIDA: sempre positivo. AJUSTE: delta com sinal.
+  reason     String   // "Compra 200un" | "Pedido #45" | "Estorno pedido #45" | "Inventário"
+  orderId    String?  // vincula à baixa/estorno automático de produção
+  reversed   Boolean  @default(false) // SAIDA já estornada? (evita duplo estorno)
+  balance    Float    // saldo do produto após o movimento (snapshot auditável)
+  unitCost   Float?   // custo unitário informado na entrada
+  userId     String?
+  userName   String?  @default("")
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model PriceTable {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     PriceTableItem[]
+  customers Customer[]
+}
+
+model PriceTableItem {
+  id           String     @id @default(cuid())
+  priceTableId String
+  priceTable   PriceTable @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price        Float
+
+  @@unique([priceTableId, productId])
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  orderNumber     Int      @unique @default(autoincrement())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  plateNumber     String?  @default("")
+  plateType       String?  @default("Mercosul") // Mercosul or Antiga
+  vehicleModel    String?  @default("")
+  status          String   @default("ABERTO") // ABERTO, PAGO
+  paymentMethod   String?  @default("PIX")
+  totalAmount     Float    @default(0)
+  paidAmount      Float    @default(0)
+  cancelReason    String?  @default("")
+  notes           String?  @default("")
+  // Soft Delete
+  deleted         Boolean  @default(false)
+  deletedAt       DateTime?
+  deletedById     String?
+  deleteReason    String?  @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  invoiceId    String?
+  invoice      Invoice? @relation(fields: [invoiceId], references: [id])
+
+  items       OrderItem[]
+  payments    Payment[]
+  audits      OrderAudit[]
+  discounts   InvoiceDiscount[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([customerId])
+  @@index([deleted])
+  @@index([invoiceId])
+}
+
+model OrderAudit {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id])
+  userId       String
+  userName     String   @default("") // nome do usuário para referência rápida
+  action       String   // ALTERACAO, EXCLUSAO, RECEBIMENTO
+  reason       String?  @default("")
+  previousData String?  @db.Text // JSON snapshot do pedido antes
+  createdAt    DateTime @default(now())
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  description String
+  plateNumber String? @default("")
+  quantity    Int     @default(1)
+  unitPrice   Float
+  totalPrice  Float
+}
+
+model CashRegister {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  openDate       DateTime @default(now())
+  closeDate      DateTime?
+  initialBalance Float    @default(0)
+  finalBalance   Float?   @default(0)
+  countedBalance Float?   // valor conferido fisicamente
+  difference     Float?   @default(0) // diferença entre sistema e conferido
+  status         String   @default("ABERTO") // ABERTO, EM_CONFERENCIA, FECHADO
+  responsible    String?  @default("") // responsável pelo caixa
+  closingNotes   String?  @default("")
+  reopenReason   String?  @default("") // motivo da reabertura
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  movements CashMovement[]
+
+  @@index([status])
+  @@index([openDate])
+}
+
+model CashMovement {
+  id             String       @id @default(cuid())
+  cashRegisterId String
+  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id], onDelete: Cascade)
+  type           String       // ENTRADA, SAIDA, SANGRIA, SUPRIMENTO, ESTORNO
+  amount         Float
+  description    String
+  paymentMethod  String?      @default("")
+  orderId        String?      @default("")
+  cancelled      Boolean      @default(false)
+  cancelReason   String?      @default("")
+  refMovementId  String?      @default("") // referência ao movimento estornado
+  attachmentUrl  String?      // cloud storage path do comprovante
+  createdAt      DateTime     @default(now())
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod String
+  notes         String?  @default("")
+  createdAt     DateTime @default(now())
+}
+
+model MonthlySend {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  periodStart DateTime
+  periodEnd   DateTime
+  totalAmount Float    @default(0)
+  plateCount  Int      @default(0)
+  sentAt      DateTime @default(now())
+  sentVia     String   @default("WHATSAPP") // WHATSAPP, EMAIL, MANUAL
+  notes       String?  @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@index([sentAt])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  category    String   @default("Outros")
+  supplier    String?  @default("")
+  dueDate     DateTime?
+  status      String   @default("PENDENTE") // PENDENTE, PAGO
+  paidAt      DateTime?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([category])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  number          String   @unique              // "2026-06-001"
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  periodStart     DateTime
+  periodEnd       DateTime
+
+  previousBalance Float    @default(0)
+  servicesTotal   Float    @default(0)
+  amountDue       Float    @default(0)
+  amountReceived  Float    @default(0)
+
+  // Encadeamento: saldo anterior vem do "em aberto" da fatura anterior
+  previousInvoiceId String?
+  previousInvoice   Invoice?  @relation("InvoiceChain", fields: [previousInvoiceId], references: [id])
+  nextInvoices      Invoice[] @relation("InvoiceChain")
+
+  dueDate         DateTime
+  status          String   @default("GERADA") // GERADA, ENVIADA, CONFERIDA, PARCIAL, PAGA, VENCIDA, CANCELADA
+
+  sentAt          DateTime?
+  confirmedAt     DateTime?
+  paidAt          DateTime?
+  cancelReason    String?  @default("")
+
+  orderCount      Int      @default(0)
+  plateCount      Int      @default(0)
+
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orders          Order[]
+  discounts       InvoiceDiscount[]
+
+  @@unique([customerId, periodStart])
+  @@index([status, dueDate])
+  @@index([customerId])
+}
+
+model InvoiceDiscount {
+  id          String   @id @default(cuid())
+  invoiceId   String?
+  invoice     Invoice?  @relation(fields: [invoiceId], references: [id])
+  orderId     String?
+  order       Order?    @relation(fields: [orderId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  userName    String   @default("")
+  customerId  String
+  customerName String  @default("")
+  invoiceNumber String @default("")
+  orderNumber  Int?    @default(0)
+  amount      Float
+  reason      String
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([createdAt])
+}

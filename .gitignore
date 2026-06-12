@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files — NUNCA versionar (contêm senhas/segredos)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# vercel
+.vercel
+
+# duplicata do backup (não deve ir para o repositório)
+/central_placas_backup/
+
+# arquivos de mídia pesados gerados
+/public/downloads/
