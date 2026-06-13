@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { validatePassword } from '@/lib/password';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -17,6 +18,10 @@ export async function POST(req: NextRequest) {
     const { email, password, name } = body ?? {};
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Campos obrigatórios: nome, email e senha' }, { status: 400 });
+    }
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: `Senha fraca: ${pwCheck.errors.join(', ')}` }, { status: 400 });
     }
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {

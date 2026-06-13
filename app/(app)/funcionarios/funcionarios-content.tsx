@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { UserCog, Plus, Edit, Trash2, Loader2, X, Search, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { ROLE_LABELS, ROLES } from '@/lib/permissions';
 import { maskPhone } from '@/lib/utils';
+import { validatePassword, passwordStrength } from '@/lib/password';
 
 interface UserRow {
   id: string;
@@ -84,9 +85,12 @@ export function FuncionariosContent() {
       toast.error('Senha é obrigatória para novo funcionário');
       return;
     }
-    if (form.password && form.password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres');
-      return;
+    if (form.password) {
+      const pwCheck = validatePassword(form.password);
+      if (!pwCheck.valid) {
+        toast.error(`Senha fraca: ${pwCheck.errors.join(', ')}`);
+        return;
+      }
     }
     if (form.password && form.password !== form.confirmPassword) {
       toast.error('As senhas não conferem');
@@ -274,8 +278,21 @@ export function FuncionariosContent() {
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#2B7DB7] outline-none"
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mín. 8 caracteres, maiúscula e número"
                   />
+                  {form.password && (() => {
+                    const strength = passwordStrength(form.password);
+                    const colors = { fraca: 'bg-red-400', média: 'bg-yellow-400', forte: 'bg-green-500' };
+                    const widths = { fraca: 'w-1/3', média: 'w-2/3', forte: 'w-full' };
+                    return (
+                      <div className="mt-1">
+                        <div className="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${colors[strength]} ${widths[strength]}`} />
+                        </div>
+                        <p className="text-[10px] mt-0.5 text-gray-500">Força: <span className={strength === 'forte' ? 'text-green-600 font-medium' : strength === 'média' ? 'text-yellow-600 font-medium' : 'text-red-500 font-medium'}>{strength}</span></p>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">

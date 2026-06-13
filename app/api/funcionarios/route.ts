@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { upper } from '@/lib/utils';
 import bcrypt from 'bcryptjs';
+import { validatePassword } from '@/lib/password';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -44,8 +45,9 @@ export async function POST(req: NextRequest) {
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios' }, { status: 400 });
     }
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'A senha deve ter pelo menos 6 caracteres' }, { status: 400 });
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      return NextResponse.json({ error: `Senha fraca: ${pwCheck.errors.join(', ')}` }, { status: 400 });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -93,8 +95,9 @@ export async function PUT(req: NextRequest) {
     if (commissionRate !== undefined) data.commissionRate = commissionRate;
     if (discountLimit !== undefined) data.discountLimit = discountLimit;
     if (password) {
-      if (password.length < 6) {
-        return NextResponse.json({ error: 'A senha deve ter pelo menos 6 caracteres' }, { status: 400 });
+      const pwCheck = validatePassword(password);
+      if (!pwCheck.valid) {
+        return NextResponse.json({ error: `Senha fraca: ${pwCheck.errors.join(', ')}` }, { status: 400 });
       }
       data.password = await bcrypt.hash(password, 10);
     }
