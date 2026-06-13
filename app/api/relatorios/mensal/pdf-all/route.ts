@@ -288,43 +288,9 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`;
 
-    const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: htmlContent,
-        pdf_options: { format: 'A4', margin: { top: '15mm', bottom: '15mm', left: '15mm', right: '15mm' }, print_background: true },
-      }),
+    return new NextResponse(htmlContent, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
-
-    if (!createResponse.ok) return NextResponse.json({ error: 'Erro ao criar requisição de PDF' }, { status: 500 });
-    const { request_id } = await createResponse.json();
-    if (!request_id) return NextResponse.json({ error: 'Nenhum request_id retornado' }, { status: 500 });
-
-    let attempts = 0;
-    while (attempts < 120) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const statusResponse = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusResponse.json();
-      if (statusResult?.status === 'SUCCESS' && statusResult?.result?.result) {
-        const pdfBuffer = Buffer.from(statusResult.result.result, 'base64');
-        return new NextResponse(pdfBuffer, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="relatorio_mensal_consolidado.pdf"`,
-          },
-        });
-      } else if (statusResult?.status === 'FAILED') {
-        return NextResponse.json({ error: 'Falha ao gerar PDF' }, { status: 500 });
-      }
-      attempts++;
-    }
-    return NextResponse.json({ error: 'Timeout ao gerar PDF' }, { status: 500 });
   } catch (error) {
     console.error('[RELATORIO-MENSAL] PDF-ALL error:', error);
     return NextResponse.json({ error: 'Erro ao gerar PDF consolidado' }, { status: 500 });

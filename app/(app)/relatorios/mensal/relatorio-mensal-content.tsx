@@ -216,6 +216,15 @@ export function RelatorioMensalContent() {
 
   const getClientDefaultFormat = (c: ClienteEnvio) => c.customer.reportType === 'resumido' ? 'resumido' : 'detalhado';
 
+  const openHtmlPrint = (html: string) => {
+    const w = window.open('', '_blank');
+    if (!w) { toast.error('Permita pop-ups para imprimir'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 600);
+  };
+
   const downloadPdf = async (c: ClienteEnvio, formatOverride?: string) => {
     setPdfDropdownOpen(null);
     setGeneratingPdf(c.customer.id);
@@ -224,25 +233,13 @@ export function RelatorioMensalContent() {
       const res = await fetch('/api/relatorios/mensal/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Enviamos só identificadores — o servidor calcula os números (fonte única).
-        body: JSON.stringify({
-          clienteId: c.customer.id,
-          dateFrom,
-          dateTo,
-          situacao,
-          format: fmt,
-        }),
+        body: JSON.stringify({ clienteId: c.customer.id, dateFrom, dateTo, situacao, format: fmt }),
       });
-      if (!res.ok) throw new Error('Falha ao gerar PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio_mensal_${c.customer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`PDF (${fmt === 'resumido' ? 'Resumido' : 'Detalhado'}) gerado com sucesso!`);
-    } catch { toast.error('Erro ao gerar PDF'); }
+      if (!res.ok) throw new Error('Falha ao gerar relatório');
+      const html = await res.text();
+      openHtmlPrint(html);
+      toast.success(`Relatório (${fmt === 'resumido' ? 'Resumido' : 'Detalhado'}) aberto para impressão!`);
+    } catch { toast.error('Erro ao gerar relatório'); }
     setGeneratingPdf(null);
   };
 
@@ -252,18 +249,12 @@ export function RelatorioMensalContent() {
       const res = await fetch('/api/relatorios/mensal/pdf-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Identificadores — servidor recalcula todos os clientes (fonte única).
         body: JSON.stringify({ dateFrom, dateTo, situacao, apenasEnvioMensal }),
       });
-      if (!res.ok) throw new Error('Falha ao gerar PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'relatorio_mensal_consolidado.pdf';
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('PDF consolidado gerado com sucesso!');
+      if (!res.ok) throw new Error('Falha ao gerar relatório');
+      const html = await res.text();
+      openHtmlPrint(html);
+      toast.success('Relatório consolidado aberto para impressão!');
     } catch { toast.error('Erro ao gerar PDF consolidado'); }
     setGeneratingAllPdf(false);
   };

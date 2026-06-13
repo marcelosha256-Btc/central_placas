@@ -117,15 +117,15 @@ export function RelatorioCaixaContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data, summary, viewLabel: getViewLabel() }),
       });
-      if (!res.ok) throw new Error('Falha ao gerar PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio_caixa_${dateFrom}_${dateTo}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('PDF gerado com sucesso!');
+      if (!res.ok) throw new Error('Falha ao gerar relatório');
+      const html = await res.text();
+      const w = window.open('', '_blank');
+      if (!w) { toast.error('Permita pop-ups para imprimir'); setGeneratingPdf(false); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 600);
+      toast.success('Relatório aberto para impressão!');
     } catch { toast.error('Erro ao gerar PDF'); }
     setGeneratingPdf(false);
   };
