@@ -113,7 +113,11 @@ export function FuncionariosContent() {
       return;
     }
     const cpfDigits = (form.cpf || '').replace(/\D/g, '');
-    if (cpfDigits && !isValidCpf(cpfDigits)) {
+    if (!cpfDigits) {
+      toast.error('CPF é obrigatório');
+      return;
+    }
+    if (!isValidCpf(cpfDigits)) {
       toast.error('CPF inválido');
       return;
     }
@@ -331,7 +335,7 @@ export function FuncionariosContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">CPF</label>
+                  <label className="block text-sm font-medium mb-1">CPF *</label>
                   <div className="relative">
                     <input
                       value={form.cpf}

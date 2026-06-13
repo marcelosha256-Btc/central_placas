@@ -57,11 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     const cpfClean = (cpf || '').replace(/\D/g, '');
-    if (cpfClean) {
-      const existingCpf = await prisma.user.findFirst({ where: { cpf: cpfClean } });
-      if (existingCpf) {
-        return NextResponse.json({ error: 'CPF já cadastrado para outro funcionário' }, { status: 400 });
-      }
+    if (!cpfClean) {
+      return NextResponse.json({ error: 'CPF é obrigatório' }, { status: 400 });
+    }
+    const existingCpf = await prisma.user.findFirst({ where: { cpf: cpfClean } });
+    if (existingCpf) {
+      return NextResponse.json({ error: 'CPF já cadastrado para outro funcionário' }, { status: 400 });
     }
 
     const hashed = await bcrypt.hash(password, 10);
