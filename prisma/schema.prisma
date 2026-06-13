@@ -15,6 +15,7 @@ model User {
   password       String
   role           String   @default("admin")
   phone          String?  @default("")
+  cpf            String?  @default("")
   active         Boolean  @default(true)
   commissionRate Float?   @default(0)
   createdAt      DateTime @default(now())

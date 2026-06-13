@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
         email: true,
         role: true,
         phone: true,
+        cpf: true,
         active: true,
         commissionRate: true,
         discountLimit: true,
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { name, email, password, role, phone, active, commissionRate, discountLimit } = await req.json();
+    const { name, email, password, role, phone, cpf, active, commissionRate, discountLimit } = await req.json();
     if (!name || !email || !password) {
       return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios' }, { status: 400 });
     }
@@ -55,6 +56,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Já existe um usuário com este e-mail' }, { status: 400 });
     }
 
+    const cpfClean = (cpf || '').replace(/\D/g, '');
+    if (cpfClean) {
+      const existingCpf = await prisma.user.findFirst({ where: { cpf: cpfClean } });
+      if (existingCpf) {
+        return NextResponse.json({ error: 'CPF já cadastrado para outro funcionário' }, { status: 400 });
+      }
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
@@ -63,6 +72,7 @@ export async function POST(req: NextRequest) {
         password: hashed,
         role: role || 'vendedor',
         phone: phone || '',
+        cpf: cpfClean,
         active: active !== false,
         commissionRate: commissionRate || 0,
         discountLimit: discountLimit || 0,
@@ -83,7 +93,7 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const { id, name, email, password, role, phone, active, commissionRate, discountLimit } = await req.json();
+    const { id, name, email, password, role, phone, cpf, active, commissionRate, discountLimit } = await req.json();
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
 
     const data: any = {};
@@ -94,6 +104,18 @@ export async function PUT(req: NextRequest) {
     if (active !== undefined) data.active = active;
     if (commissionRate !== undefined) data.commissionRate = commissionRate;
     if (discountLimit !== undefined) data.discountLimit = discountLimit;
+
+    if (cpf !== undefined) {
+      const cpfClean = (cpf || '').replace(/\D/g, '');
+      if (cpfClean) {
+        const existingCpf = await prisma.user.findFirst({ where: { cpf: cpfClean, NOT: { id } } });
+        if (existingCpf) {
+          return NextResponse.json({ error: 'CPF já cadastrado para outro funcionário' }, { status: 400 });
+        }
+      }
+      data.cpf = cpfClean;
+    }
+
     if (password) {
       const pwCheck = validatePassword(password);
       if (!pwCheck.valid) {
@@ -120,7 +142,6 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
 
-    // Desativa em vez de deletar (mantém histórico)
     await prisma.user.update({ where: { id }, data: { active: false } });
     return NextResponse.json({ success: true });
   } catch (err: any) {

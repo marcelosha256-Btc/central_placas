@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { UserCog, Plus, Edit, Trash2, Loader2, X, Search, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { ROLE_LABELS, ROLES } from '@/lib/permissions';
-import { maskPhone } from '@/lib/utils';
+import { maskPhone, maskCpf, isValidCpf } from '@/lib/utils';
 import { validatePassword, passwordStrength } from '@/lib/password';
 
 interface UserRow {
@@ -13,6 +13,7 @@ interface UserRow {
   email: string;
   role: string;
   phone: string;
+  cpf: string;
   active: boolean;
   commissionRate: number;
   discountLimit: number;
@@ -26,6 +27,7 @@ const emptyForm = {
   confirmPassword: '',
   role: 'vendedor',
   phone: '',
+  cpf: '',
   active: true,
   commissionRate: 0,
   discountLimit: 0,
@@ -39,6 +41,7 @@ export function FuncionariosContent() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [cpfStatus, setCpfStatus] = useState<'idle' | 'valid' | 'invalid' | 'duplicate'>('idle');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,6 +60,7 @@ export function FuncionariosContent() {
   const openNew = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setCpfStatus('idle');
     setShowForm(true);
   };
 
@@ -69,11 +73,23 @@ export function FuncionariosContent() {
       confirmPassword: '',
       role: u.role,
       phone: u.phone || '',
+      cpf: u.cpf ? maskCpf(u.cpf) : '',
       active: u.active,
       commissionRate: u.commissionRate || 0,
       discountLimit: u.discountLimit || 0,
     });
+    setCpfStatus(u.cpf ? 'valid' : 'idle');
     setShowForm(true);
+  };
+
+  const handleCpfChange = (raw: string) => {
+    const masked = maskCpf(raw);
+    setForm(f => ({ ...f, cpf: masked }));
+    const digits = masked.replace(/\D/g, '');
+    if (digits.length === 0) { setCpfStatus('idle'); return; }
+    if (digits.length < 11) { setCpfStatus('idle'); return; }
+    if (!isValidCpf(digits)) { setCpfStatus('invalid'); return; }
+    setCpfStatus('valid');
   };
 
   const handleSave = async () => {
@@ -94,6 +110,11 @@ export function FuncionariosContent() {
     }
     if (form.password && form.password !== form.confirmPassword) {
       toast.error('As senhas não conferem');
+      return;
+    }
+    const cpfDigits = (form.cpf || '').replace(/\D/g, '');
+    if (cpfDigits && !isValidCpf(cpfDigits)) {
+      toast.error('CPF inválido');
       return;
     }
     setSaving(true);
@@ -309,6 +330,25 @@ export function FuncionariosContent() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">CPF</label>
+                  <div className="relative">
+                    <input
+                      value={form.cpf}
+                      onChange={(e) => handleCpfChange(e.target.value)}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm outline-none pr-8 ${
+                        cpfStatus === 'valid' ? 'border-green-400 focus:ring-2 focus:ring-green-400' :
+                        cpfStatus === 'invalid' ? 'border-red-400 focus:ring-2 focus:ring-red-400' :
+                        'focus:ring-2 focus:ring-[#2B7DB7]'
+                      }`}
+                      placeholder="000.000.000-00"
+                      maxLength={14}
+                    />
+                    {cpfStatus === 'valid' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</span>}
+                    {cpfStatus === 'invalid' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 text-sm">✗</span>}
+                  </div>
+                  {cpfStatus === 'invalid' && <p className="text-[10px] text-red-500 mt-0.5">CPF inválido</p>}
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Telefone</label>
                   <input
