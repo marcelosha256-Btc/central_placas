@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   admin: ['dashboard', 'pedidos', 'clientes', 'produtos', 'tabelas-preco', 'estoque', 'financeiro', 'relatorios', 'auditoria', 'funcionarios'],
   vendedor: ['dashboard', 'pedidos', 'clientes', 'produtos', 'tabelas-preco'],
-  caixa: ['dashboard', 'pedidos', 'estoque', 'financeiro', 'relatorios'],
+  caixa: ['dashboard', 'pedidos', 'clientes', 'produtos', 'estoque', 'financeiro', 'relatorios'],
 };
 
 const API_ROUTE_MODULE: Record<string, string> = {

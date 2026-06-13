@@ -75,8 +75,8 @@ export function PedidosContent() {
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
   useEffect(() => {
-    fetch('/api/customers?all=1').then(r => r.json()).then(d => setCustomers(d ?? [])).catch(() => {});
-    fetch('/api/products?all=1').then(r => r.json()).then(d => setProducts(d ?? [])).catch(() => {});
+    fetch('/api/customers?all=1').then(r => r.json()).then(d => setCustomers(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch('/api/products?all=1').then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   // Verificar placa duplicada no sistema (debounce 600ms)
