@@ -117,13 +117,13 @@ export function FaturamentoContent() {
     try {
       const res = await fetch(`/api/invoices/${inv.id}/pdf`);
       if (!res.ok) throw new Error('Falha ao gerar PDF');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `fatura_${inv.number}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const html = await res.text();
+      const w = window.open('', '_blank');
+      if (!w) { alert('Permita pop-ups para imprimir'); setPdfLoading(null); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 600);
     } catch {
       alert('Erro ao gerar PDF');
     } finally {

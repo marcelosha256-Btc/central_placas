@@ -112,14 +112,25 @@ export function ContasReceberContent() {
         }),
       });
       if (!res.ok) { toast.error('Erro ao gerar arquivo'); setExporting(null); return; }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contas_receber.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`${type.toUpperCase()} gerado com sucesso!`);
+      if (type === 'pdf') {
+        const html = await res.text();
+        const w = window.open('', '_blank');
+        if (!w) { toast.error('Permita pop-ups para imprimir'); setExporting(null); return; }
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(() => w.print(), 600);
+        toast.success('Relatório aberto para impressão!');
+      } else {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `contas_receber.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('XLS gerado com sucesso!');
+      }
     } catch { toast.error('Erro ao exportar'); }
     setExporting(null);
   };
